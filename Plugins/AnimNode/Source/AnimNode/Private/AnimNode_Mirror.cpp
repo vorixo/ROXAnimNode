@@ -1,7 +1,11 @@
+
+
 #include "AnimNode_Mirror.h"
 #include "AnimationRuntime.h"
 #include "Animation/AnimInstanceProxy.h"
 
+/////////////////////////////////////////////////////
+// FAnimNode_ModifyBone
 
 FAnimNode_Mirror::FAnimNode_Mirror()
 	: Translation(FVector::ZeroVector)
@@ -14,7 +18,6 @@ FAnimNode_Mirror::FAnimNode_Mirror()
 	, RotationSpace(BCS_ComponentSpace)
 	, ScaleSpace(BCS_ComponentSpace)
 {
-
 }
 
 void FAnimNode_Mirror::GatherDebugData(FNodeDebugData& DebugData)
@@ -105,7 +108,7 @@ void FAnimNode_Mirror::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseCont
 		FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, TranslationSpace);
 	}
 
-	OutBoneTransforms.Add(FBoneTransform(BoneToModify.GetCompactPoseIndex(BoneContainer), NewBoneTM));
+	OutBoneTransforms.Add( FBoneTransform(BoneToModify.GetCompactPoseIndex(BoneContainer), NewBoneTM) );
 }
 
 bool FAnimNode_Mirror::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)

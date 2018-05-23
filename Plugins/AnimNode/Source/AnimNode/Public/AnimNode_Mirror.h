@@ -1,3 +1,5 @@
+
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -5,35 +7,23 @@
 #include "BoneContainer.h"
 #include "BonePose.h"
 #include "BoneControllers/AnimNode_SkeletalControlBase.h"
+#include "BoneControllers/AnimNode_ModifyBone.h"
 #include "AnimNode_Mirror.generated.h"
 
 class USkeletalMeshComponent;
 
-UENUM()
-enum EBoneModificationMode
-{
-	/** The modifier ignores this channel (keeps the existing bone translation, rotation, or scale). */
-	BMM_Ignore UMETA(DisplayName = "Ignore"),
-
-	/** The modifier replaces the existing translation, rotation, or scale. */
-	BMM_Replace UMETA(DisplayName = "Replace Existing"),
-
-	/** The modifier adds to the existing translation, rotation, or scale. */
-	BMM_Additive UMETA(DisplayName = "Add to Existing")
-};
 
 USTRUCT(BlueprintType)
 struct FBonesTransfroms
 {
 	GENERATED_BODY()
-	/*Array of names*/
+	// Array of names
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BonesTransfroms")
 	TArray <FName> Names;
-	/*Array of transforms*/
+	// Array of transforms
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BonesTransfroms")
 	TArray <FTransform> Transforms;
 };
-
 
 USTRUCT(BlueprintInternalUseOnly)
 struct ANIMNODE_API FAnimNode_Mirror : public FAnimNode_SkeletalControlBase
@@ -45,8 +35,8 @@ struct ANIMNODE_API FAnimNode_Mirror : public FAnimNode_SkeletalControlBase
 	FBoneReference BoneToModify;
 
 	/** New translation of bone to apply. */
-	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = SkeletalControl, meta = (PinShownByDefault))
-	//FBonesTransfroms BonesTransfroms;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = SkeletalControl, meta = (PinShownByDefault))
+	FBonesTransfroms BonesTransfroms;
 
 	/** New translation of bone to apply. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Translation, meta = (PinShownByDefault))

@@ -48,12 +48,12 @@ void UAnimGraphNode_Mirror::ValidateAnimNodeDuringCompilation(USkeleton* ForSkel
 
 FText UAnimGraphNode_Mirror::GetControllerDescription() const
 {
-	return LOCTEXT("TransformModifyBones", "ROX: Transform (Modify) Bones");
+	return LOCTEXT("ROXTransformModifyBones", "ROX: Transform (Modify) Bones");
 }
 
 FText UAnimGraphNode_Mirror::GetTooltipText() const
 {
-	return LOCTEXT("AnimGraphNode_ModifyBone_Tooltip", "The Transform Bone node alters the transform - i.e. Translation, Rotation, or Scale - of the bone");
+	return LOCTEXT("AnimGraphNode_Mirror_Tooltip", "The Transform Bone node alters the transform - i.e. Translation, Rotation, or Scale - of the bone");
 }
 
 FText UAnimGraphNode_Mirror::GetNodeTitle(ENodeTitleType::Type TitleType) const
@@ -73,11 +73,11 @@ FText UAnimGraphNode_Mirror::GetNodeTitle(ENodeTitleType::Type TitleType) const
 		// FText::Format() is slow, so we cache this to save on performance
 		if (TitleType == ENodeTitleType::ListView || TitleType == ENodeTitleType::MenuTitle)
 		{
-			CachedNodeTitles.SetCachedTitle(TitleType, FText::Format(LOCTEXT("AnimGraphNode_ModifyBone_ListTitle", "{ControllerDescription} - Bone: {BoneName}"), Args), this);
+			CachedNodeTitles.SetCachedTitle(TitleType, FText::Format(LOCTEXT("AnimGraphNode_Mirror_ListTitle", "{ControllerDescription} - Bone: {BoneName}"), Args), this);
 		}
 		else
 		{
-			CachedNodeTitles.SetCachedTitle(TitleType, FText::Format(LOCTEXT("AnimGraphNode_ModifyBone_Title", "{ControllerDescription}\nBone: {BoneName}"), Args), this);
+			CachedNodeTitles.SetCachedTitle(TitleType, FText::Format(LOCTEXT("AnimGraphNode_Mirror_Title", "{ControllerDescription}\nBone: {BoneName}"), Args), this);
 		}
 	}
 	return CachedNodeTitles[TitleType];
@@ -105,7 +105,7 @@ void UAnimGraphNode_Mirror::CopyNodeDataToPreviewNode(FAnimNode_Base* InPreviewN
 
 FEditorModeID UAnimGraphNode_Mirror::GetEditorMode() const
 {
-	return AnimNodeEditModes::ModifyBone;
+	return AnimNodeEditModes::AnimNode;
 }
 
 void UAnimGraphNode_Mirror::CopyPinDefaultsToNodeData(UEdGraphPin* InPin)
