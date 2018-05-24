@@ -8,10 +8,7 @@
 // FAnimNode_ModifyBone
 
 FAnimNode_Mirror::FAnimNode_Mirror()
-	: Translation(FVector::ZeroVector)
-	, Rotation(FRotator::ZeroRotator)
-	, Scale(FVector(1.0f))
-	, TranslationMode(BMM_Ignore)
+	: TranslationMode(BMM_Ignore)
 	, RotationMode(BMM_Ignore)
 	, ScaleMode(BMM_Ignore)
 	, TranslationSpace(BCS_ComponentSpace)
@@ -26,7 +23,13 @@ void FAnimNode_Mirror::GatherDebugData(FNodeDebugData& DebugData)
 
 	DebugLine += "(";
 	AddDebugNodeData(DebugLine);
-	DebugLine += FString::Printf(TEXT(" Target: %s)"), *BoneToModify.BoneName.ToString());
+	
+	FString setOfBones = "";
+	for (auto It = BonesTransfroms.Map_IdxTransform.CreateConstIterator(); It; ++It) {
+		setOfBones += It.Key().ToString() + " ";
+	}
+
+	DebugLine += FString::Printf(TEXT(" Target: %s)"), *setOfBones);
 	DebugData.AddDebugItem(DebugLine);
 
 	ComponentPose.GatherDebugData(DebugData);
@@ -34,90 +37,97 @@ void FAnimNode_Mirror::GatherDebugData(FNodeDebugData& DebugData)
 
 void FAnimNode_Mirror::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
 {
-
-	// TODO: 
-	// uint32 boneIndex = Output.AnimInstanceProxy->GetSkelMeshComponent()->GetBoneIndex(FName());
-	// FBoneReference br;
-	// br.BoneIndex = boneIndex;
-	// FCompactPoseBoneIndex CompactPoseBoneToModify = br.GetCompactPoseIndex(BoneContainer);
-	// for loop ~~~~~~~~~~~~ :^)
-
 	check(OutBoneTransforms.Num() == 0);
+	
+	if (BonesTransfroms.Map_IdxTransform.Num() == 0 || SetOfBonesToModify.Num() == 0)
+		return;
 
 	// the way we apply transform is same as FMatrix or FTransform
 	// we apply scale first, and rotation, and translation
 	// if you'd like to translate first, you'll need two nodes that first node does translate and second nodes to rotate.
 	const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
 
-	FCompactPoseBoneIndex CompactPoseBoneToModify = BoneToModify.GetCompactPoseIndex(BoneContainer);
-	FTransform NewBoneTM = Output.Pose.GetComponentSpaceTransform(CompactPoseBoneToModify);
-	FTransform ComponentTransform = Output.AnimInstanceProxy->GetComponentTransform();
-
-	if (ScaleMode != BMM_Ignore)
+	for (auto& b_m : SetOfBonesToModify)
 	{
-		// Convert to Bone Space.
-		FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, ScaleSpace);
+		FCompactPoseBoneIndex CompactPoseBoneToModify = b_m.GetCompactPoseIndex(BoneContainer);
+		FTransform NewBoneTM = Output.Pose.GetComponentSpaceTransform(CompactPoseBoneToModify);
+		FTransform ComponentTransform = Output.AnimInstanceProxy->GetComponentTransform();
 
-		if (ScaleMode == BMM_Additive)
+		FTransform cachedTransform(*BonesTransfroms.Map_IdxTransform.Find(b_m.BoneName));
+		
+		if (ScaleMode != BMM_Ignore)
 		{
-			NewBoneTM.SetScale3D(NewBoneTM.GetScale3D() * Scale);
-		}
-		else
-		{
-			NewBoneTM.SetScale3D(Scale);
+			// Convert to Bone Space.
+			FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, ScaleSpace);
+
+			if (ScaleMode == BMM_Additive)
+			{
+				NewBoneTM.SetScale3D(NewBoneTM.GetScale3D() * (cachedTransform.GetScale3D()));
+			}
+			else
+			{
+				NewBoneTM.SetScale3D(cachedTransform.GetScale3D());
+			}
+
+			// Convert back to Component Space.
+			FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, ScaleSpace);
 		}
 
-		// Convert back to Component Space.
-		FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, ScaleSpace);
+		if (RotationMode != BMM_Ignore)
+		{
+			// Convert to Bone Space.
+			FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, RotationSpace);
+
+			const FQuat BoneQuat(cachedTransform.GetRotation());
+			if (RotationMode == BMM_Additive)
+			{
+				NewBoneTM.SetRotation(BoneQuat * NewBoneTM.GetRotation());
+			}
+			else
+			{
+				NewBoneTM.SetRotation(BoneQuat);
+			}
+
+			// Convert back to Component Space.
+			FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, RotationSpace);
+		}
+
+		if (TranslationMode != BMM_Ignore)
+		{
+			// Convert to Bone Space.
+			FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, TranslationSpace);
+
+			if (TranslationMode == BMM_Additive)
+			{
+				NewBoneTM.AddToTranslation(cachedTransform.GetTranslation());
+			}
+			else
+			{
+				NewBoneTM.SetTranslation(cachedTransform.GetTranslation());
+			}
+
+			// Convert back to Component Space.
+			FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, TranslationSpace);
+		}
+
+		OutBoneTransforms.Add(FBoneTransform(b_m.GetCompactPoseIndex(BoneContainer), NewBoneTM));
 	}
-
-	if (RotationMode != BMM_Ignore)
-	{
-		// Convert to Bone Space.
-		FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, RotationSpace);
-
-		const FQuat BoneQuat(Rotation);
-		if (RotationMode == BMM_Additive)
-		{
-			NewBoneTM.SetRotation(BoneQuat * NewBoneTM.GetRotation());
-		}
-		else
-		{
-			NewBoneTM.SetRotation(BoneQuat);
-		}
-
-		// Convert back to Component Space.
-		FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, RotationSpace);
-	}
-
-	if (TranslationMode != BMM_Ignore)
-	{
-		// Convert to Bone Space.
-		FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, TranslationSpace);
-
-		if (TranslationMode == BMM_Additive)
-		{
-			NewBoneTM.AddToTranslation(Translation);
-		}
-		else
-		{
-			NewBoneTM.SetTranslation(Translation);
-		}
-
-		// Convert back to Component Space.
-		FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, NewBoneTM, CompactPoseBoneToModify, TranslationSpace);
-	}
-
-	OutBoneTransforms.Add( FBoneTransform(BoneToModify.GetCompactPoseIndex(BoneContainer), NewBoneTM) );
 }
 
 bool FAnimNode_Mirror::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
 {
-	// if both bones are valid
-	return (BoneToModify.IsValidToEvaluate(RequiredBones));
+	for (auto& b_m : SetOfBonesToModify) {
+		if (!b_m.IsValidToEvaluate(RequiredBones))
+			return false;
+	}
+	return true;
 }
 
 void FAnimNode_Mirror::InitializeBoneReferences(const FBoneContainer& RequiredBones)
 {
-	BoneToModify.Initialize(RequiredBones);
+	for (auto It = BonesTransfroms.Map_IdxTransform.CreateConstIterator(); It; ++It) {
+		FBoneReference br(It.Key());
+		br.Initialize(RequiredBones);
+		SetOfBonesToModify.AddUnique(br);
+	}
 }

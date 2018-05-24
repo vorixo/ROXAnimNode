@@ -19,10 +19,8 @@ struct FBonesTransfroms
 	GENERATED_BODY()
 	// Array of names
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BonesTransfroms")
-	TArray <FName> Names;
-	// Array of transforms
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BonesTransfroms")
-	TArray <FTransform> Transforms;
+	TMap <FName, FTransform> Map_IdxTransform;
+	// We use name for initialisation purposes
 };
 
 USTRUCT(BlueprintInternalUseOnly)
@@ -30,25 +28,13 @@ struct ANIMNODE_API FAnimNode_Mirror : public FAnimNode_SkeletalControlBase
 {
 	GENERATED_USTRUCT_BODY()	
 
-	/** Name of bone to control. This is the main bone chain to modify from. **/
-	UPROPERTY(EditAnywhere, Category = SkeletalControl)
-	FBoneReference BoneToModify;
+	/** Array of bones we will modify**/
+	UPROPERTY()
+	TArray<FBoneReference> SetOfBonesToModify;
 
 	/** New translation of bone to apply. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = SkeletalControl, meta = (PinShownByDefault))
 	FBonesTransfroms BonesTransfroms;
-
-	/** New translation of bone to apply. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Translation, meta = (PinShownByDefault))
-	FVector Translation;
-
-	/** New rotation of bone to apply. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Rotation, meta = (PinShownByDefault))
-	FRotator Rotation;
-
-	/** New Scale of bone to apply. This is only worldspace. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Scale, meta = (PinShownByDefault))
-	FVector Scale;
 
 	/** Whether and how to modify the translation of this bone. */
 	UPROPERTY(EditAnywhere, Category = Translation)

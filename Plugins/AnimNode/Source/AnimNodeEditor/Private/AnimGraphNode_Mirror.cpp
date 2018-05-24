@@ -17,33 +17,33 @@ UAnimGraphNode_Mirror::UAnimGraphNode_Mirror(const FObjectInitializer& ObjectIni
 
 void UAnimGraphNode_Mirror::ValidateAnimNodeDuringCompilation(USkeleton* ForSkeleton, FCompilerResultsLog& MessageLog)
 {
-	// Temporary fix where skeleton is not fully loaded during AnimBP compilation and thus virtual bone name check is invalid UE-39499 (NEED FIX) 
-	if (ForSkeleton && !ForSkeleton->HasAnyFlags(RF_NeedPostLoad))
-	{
-		if (ForSkeleton->GetReferenceSkeleton().FindBoneIndex(Node.BoneToModify.BoneName) == INDEX_NONE)
+	for (auto It = Node.BonesTransfroms.Map_IdxTransform.CreateConstIterator(); It; ++It) {
+		// Temporary fix where skeleton is not fully loaded during AnimBP compilation and thus virtual bone name check is invalid UE-39499 (NEED FIX) 
+		if (ForSkeleton && !ForSkeleton->HasAnyFlags(RF_NeedPostLoad))
 		{
-			if (Node.BoneToModify.BoneName == NAME_None)
+			if (ForSkeleton->GetReferenceSkeleton().FindBoneIndex(It.Key()) == INDEX_NONE)
 			{
-				MessageLog.Warning(*LOCTEXT("NoBoneSelectedToModify", "@@ - You must pick a bone to modify").ToString(), this);
-			}
-			else
-			{
-				FFormatNamedArguments Args;
-				Args.Add(TEXT("BoneName"), FText::FromName(Node.BoneToModify.BoneName));
+				if (It.Key() == NAME_None)
+				{
+					MessageLog.Warning(*LOCTEXT("NoBoneSelectedToModify", "@@ - You must pick a bone to modify").ToString(), this);
+				}
+				else
+				{
+					FFormatNamedArguments Args;
+					Args.Add(TEXT("BoneName"), FText::FromName(It.Key()));
 
-				FText Msg = FText::Format(LOCTEXT("NoBoneFoundToModify", "@@ - Bone {BoneName} not found in Skeleton"), Args);
+					FText Msg = FText::Format(LOCTEXT("NoBoneFoundToModify", "@@ - Bone {BoneName} not found in Skeleton"), Args);
 
-				MessageLog.Warning(*Msg.ToString(), this);
+					MessageLog.Warning(*Msg.ToString(), this);
+				}
 			}
 		}
+		if ((Node.TranslationMode == BMM_Ignore) && (Node.RotationMode == BMM_Ignore) && (Node.ScaleMode == BMM_Ignore))
+		{
+			MessageLog.Warning(*LOCTEXT("NothingToModify", "@@ - No components to modify selected.  Either Rotation, Translation, or Scale should be set to something other than Ignore").ToString(), this);
+		}
+		Super::ValidateAnimNodeDuringCompilation(ForSkeleton, MessageLog);
 	}
-
-	if ((Node.TranslationMode == BMM_Ignore) && (Node.RotationMode == BMM_Ignore) && (Node.ScaleMode == BMM_Ignore))
-	{
-		MessageLog.Warning(*LOCTEXT("NothingToModify", "@@ - No components to modify selected.  Either Rotation, Translation, or Scale should be set to something other than Ignore").ToString(), this);
-	}
-
-	Super::ValidateAnimNodeDuringCompilation(ForSkeleton, MessageLog);
 }
 
 FText UAnimGraphNode_Mirror::GetControllerDescription() const
@@ -58,7 +58,7 @@ FText UAnimGraphNode_Mirror::GetTooltipText() const
 
 FText UAnimGraphNode_Mirror::GetNodeTitle(ENodeTitleType::Type TitleType) const
 {
-	if ((TitleType == ENodeTitleType::ListView || TitleType == ENodeTitleType::MenuTitle) && (Node.BoneToModify.BoneName == NAME_None))
+	if ((TitleType == ENodeTitleType::ListView || TitleType == ENodeTitleType::MenuTitle) && (Node.SetOfBonesToModify.Num() == 0))
 	{
 		return GetControllerDescription();
 	}
@@ -68,8 +68,21 @@ FText UAnimGraphNode_Mirror::GetNodeTitle(ENodeTitleType::Type TitleType) const
 	{
 		FFormatNamedArguments Args;
 		Args.Add(TEXT("ControllerDescription"), GetControllerDescription());
-		Args.Add(TEXT("BoneName"), FText::FromName(Node.BoneToModify.BoneName));
+		
+		FString s_bones("");
 
+		if (Node.BonesTransfroms.Map_IdxTransform.Num() > 3) {
+			s_bones = "Multiple bones";
+		} else if (Node.BonesTransfroms.Map_IdxTransform.Num() != 0) {
+			for (auto& elem : Node.BonesTransfroms.Map_IdxTransform) {
+				s_bones += elem.Key.ToString() + " ";
+			}
+		} else {
+			s_bones = "None or coming from variable";
+		}
+		
+		Args.Add(TEXT("BoneName"), FText::FromString(s_bones));
+		
 		// FText::Format() is slow, so we cache this to save on performance
 		if (TitleType == ENodeTitleType::ListView || TitleType == ENodeTitleType::MenuTitle)
 		{
@@ -88,9 +101,14 @@ void UAnimGraphNode_Mirror::CopyNodeDataToPreviewNode(FAnimNode_Base* InPreviewN
 	FAnimNode_Mirror* ModifyBone = static_cast<FAnimNode_Mirror*>(InPreviewNode);
 
 	// copies Pin values from the internal node to get data which are not compiled yet
-	ModifyBone->Translation = Node.Translation;
-	ModifyBone->Rotation = Node.Rotation;
-	ModifyBone->Scale = Node.Scale;
+	// ModifyBone->SetOfBonesToModify = Node.SetOfBonesToModify;
+	for (auto &a : Node.SetOfBonesToModify) {
+		ModifyBone->SetOfBonesToModify.AddUnique(a);
+	}
+	// ModifyBone->BonesTransfroms.Map_IdxTransform = Node.BonesTransfroms.Map_IdxTransform;
+	for (auto &a : Node.BonesTransfroms.Map_IdxTransform) {
+		ModifyBone->BonesTransfroms.Map_IdxTransform.Emplace(a.Key, a.Value);
+	}
 
 	// copies Modes
 	ModifyBone->TranslationMode = Node.TranslationMode;
@@ -109,19 +127,6 @@ FEditorModeID UAnimGraphNode_Mirror::GetEditorMode() const
 }
 
 void UAnimGraphNode_Mirror::CopyPinDefaultsToNodeData(UEdGraphPin* InPin)
-{
-	if (InPin->GetName() == GET_MEMBER_NAME_STRING_CHECKED(FAnimNode_Mirror, Translation))
-	{
-		GetDefaultValue(GET_MEMBER_NAME_STRING_CHECKED(FAnimNode_Mirror, Translation), Node.Translation);
-	}
-	else if (InPin->GetName() == GET_MEMBER_NAME_STRING_CHECKED(FAnimNode_Mirror, Rotation))
-	{
-		GetDefaultValue(GET_MEMBER_NAME_STRING_CHECKED(FAnimNode_Mirror, Rotation), Node.Rotation);
-	}
-	else if (InPin->GetName() == GET_MEMBER_NAME_STRING_CHECKED(FAnimNode_Mirror, Scale))
-	{
-		GetDefaultValue(GET_MEMBER_NAME_STRING_CHECKED(FAnimNode_Mirror, Scale), Node.Scale);
-	}
-}
+{ }
 
 #undef LOCTEXT_NAMESPACE
